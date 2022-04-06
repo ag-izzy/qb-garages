@@ -5,6 +5,7 @@ local PlayerJob = {}
 local currentHouseGarage = nil
 local inGarageRange = false
 local OutsideVehicles = {}
+local NpcData = {}
 
 --Menus
 local function MenuGarage(type, garage, indexgarage)
@@ -264,23 +265,58 @@ end)
 --Check distances
 local function checkTakeDist(pos, loc, garage, ped, type, indexgarage)
     local takeDist = #(pos - vector3(loc.x, loc.y, loc.z))
-    if takeDist <= 15 then
-        inGarageRange = true
-        DrawMarker(2, loc.x, loc.y, loc.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.2, 0.15, 200, 0, 0, 222, false, false, false, true, false, false, false)
-        if takeDist <= 1.5 then
-            if not IsPedInAnyVehicle(ped) then
-                if type == "house" then
-                    DrawText3Ds(loc.x, loc.y, loc.z + 0.5, Lang:t("info.car_e"))
-                else
-                    DrawText3Ds(loc.x, loc.y, loc.z + 0.5, Lang:t("info."..garage.vehicle.."_e"))
+    
+    if takeDist >= 85 then -- Free up entity memory
+        if NpcData[indexgarage] then
+            if NpcData[indexgarage].ped then
+                SetEntityAsNoLongerNeeded(NpcData[indexgarage].ped)
+            end
+            NpcData[indexgarage] = nil
+        end
+        return
+    end
+
+    if takeDist <= 75 then
+        if garage.npc and not NpcData[indexgarage] then
+            NpcData[indexgarage] = { ped = nil } -- Prevent multiple threads creating the same NPC
+            Citizen.CreateThread(function()
+                local model = GetHashKey(garage.npc)
+                RequestModel(model)
+                while not HasModelLoaded(model) do
+                    Citizen.Wait(0)
                 end
-                if IsControlJustPressed(0, 38) then
-                    MenuGarage(type, garage, indexgarage)
+
+                local locPed = CreatePed(4, model, loc.x, loc.y, loc.z - 0.98, loc.w, false, true)
+                NpcData[indexgarage] = { ped = locPed }
+                PlaceObjectOnGroundProperly(locPed)
+                FreezeEntityPosition(locPed, true)
+                SetEntityInvincible(locPed, true)
+                SetBlockingOfNonTemporaryEvents(locPed, true)
+                SetEntityAsMissionEntity(locPed, false, true)
+                SetModelAsNoLongerNeeded(model)
+            end)
+        end
+        if takeDist <= 15 then
+            inGarageRange = true
+            if not garage.npc then
+                DrawMarker(2, loc.x, loc.y, loc.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.2, 0.15, 200, 0, 0, 222, false, false, false, true, false, false, false)
+            end
+            
+            if takeDist <= 1.5 then
+                if not IsPedInAnyVehicle(ped) then
+                    if type == "house" then
+                        DrawText3Ds(loc.x, loc.y, loc.z + 0.5, Lang:t("info.car_e"))
+                    else
+                        DrawText3Ds(loc.x, loc.y, loc.z + 0.5, Lang:t("info."..garage.vehicle.."_e"))
+                    end
+                    if IsControlJustPressed(0, 38) then
+                        MenuGarage(type, garage, indexgarage)
+                    end
                 end
             end
-        end
-        if takeDist >= 4 then
-            closeMenuFull()
+            if takeDist >= 4 then
+                closeMenuFull()
+            end
         end
     end
 end
