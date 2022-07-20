@@ -12,6 +12,7 @@ local currentGarageIndex = nil
 local garageZones = {}
 local lasthouse = nil
 local currentNpcData = nil
+local blipsZonesLoaded = false
 
 
 --Menus
@@ -284,7 +285,7 @@ local function enterVehicle(veh, indexgarage, type, garage)
                     InputOut = true
                     InputIn = false
                 end
-    
+
                 if plate then
                     TriggerServerEvent('qb-garages:server:UpdateOutsideVehicle', plate, nil)
                 end
@@ -426,14 +427,14 @@ RegisterNetEvent('qb-garages:client:takeOutGarage', function(data)
                 location = garage.spawnPoint
                 heading = garage.spawnPoint.w
             end
-        
+
             QBCore.Functions.SpawnVehicle(vehicle.vehicle, function(veh)
                 QBCore.Functions.TriggerCallback('qb-garage:server:GetVehicleProperties', function(properties)
-        
                     if vehicle.plate then
-                        TriggerServerEvent('qb-garages:server:UpdateOutsideVehicle', vehicle.plate, vehicle)
+                        SetNetworkIdAlwaysExistsForPlayer(NetworkGetNetworkIdFromEntity(veh), PlayerPedId(), true)
+                        TriggerServerEvent('qb-garages:server:UpdateOutsideVehicle', vehicle.plate, NetworkGetNetworkIdFromEntity(veh))
                     end
-        
+
                     QBCore.Functions.SetVehicleProperties(veh, properties)
                     SetVehicleNumberPlateText(veh, vehicle.plate)
                     SetEntityHeading(veh, heading)
@@ -451,7 +452,7 @@ RegisterNetEvent('qb-garages:client:takeOutGarage', function(data)
                         InputIn = true
                     end
                 end, vehicle.plate)
-        
+
             end, location, true)
         else
             QBCore.Functions.Notify(Lang:t("error.not_impound"), "error", 5000)
@@ -460,6 +461,8 @@ RegisterNetEvent('qb-garages:client:takeOutGarage', function(data)
 end)
 
 local function CreateBlipsZones()
+    if blipsZonesLoaded then return end
+
     PlayerData = QBCore.Functions.GetPlayerData()
     PlayerGang = PlayerData.gang
     PlayerJob = PlayerData.job
@@ -487,6 +490,7 @@ local function CreateBlipsZones()
             CreateZone("marker", garage, index)
         end
     end
+    blipsZonesLoaded = true
 end
 
 RegisterNetEvent('qb-garages:client:setHouseGarage', function(house, hasKey)
@@ -515,7 +519,8 @@ AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
     CreateBlipsZones()
 end)
 
-AddEventHandler("onResourceStart", function()
+AddEventHandler("onResourceStart", function(res)
+    if res ~= GetCurrentResourceName() then return end
     CreateBlipsZones()
 end)
 
